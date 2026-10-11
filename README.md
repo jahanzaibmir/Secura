@@ -17,8 +17,8 @@ ACCESS THE TOOL HERE: https://secura-5f5c.onrender.com
 ## Setup
 
 ```bash
-git clone https://github.com/jahanzaibmir/secura.git
-cd secura
+git clone https://github.com/jahanzaibmir/Secura.git
+cd Secura
 
 uv venv --python 3.12 .venv
 source .venv/bin/activate
