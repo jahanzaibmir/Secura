@@ -4,9 +4,7 @@
 
 A security scanner that explains itself.
 
-Secura finds vulnerabilities in your code, and an open-weight AI (Mistral 7B)
-explains every one in plain English: what is wrong, why it is dangerous,
-and exactly how to fix it.
+Secura is an open-source security analysis tool. It scans GitHub repositories and uploaded codebases for vulnerabilities using proven engines like Bandit. It explains the risk and the fix in language anyone can understand. A built in knowledge base answers everything when no AI is available, so the tool never breaks. Reports are ranked by severity and exportable to JSON, Markdown, and printable HTML. Your code never has to leave your machine.
 
 [![License](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![Model](https://img.shields.io/badge/AI-Mistral%207B-black)](https://ollama.com/library/mistral)
