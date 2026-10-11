@@ -30,6 +30,9 @@ GITHUB_REPORT_KEY = "vw_report_github_repo"
 
 
 def _public_origin() -> str:
+    explicit = os.getenv("VW_PUBLIC_API_URL")
+    if explicit:
+        return explicit.rstrip("/")
     """Origin for URLs the browser opens (report links, uploads).
     In production (VW_PROD=1, behind nginx) the UI and API share one
     origin, so it is derived from the request headers. In development
