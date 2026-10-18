@@ -114,7 +114,8 @@ def _zip_files(files: list) -> tuple:
 def _folder_form() -> None:
     nonce = st.session_state.get(UPLOAD_NONCE, 0)
     files = st.file_uploader(
-        "Folder", accept_multiple_files="directory", max_upload_size=FOLDER_FILE_LIMIT_MB,
+        "Folder", accept_multiple_files="directory",
+        max_upload_size=min(FOLDER_FILE_LIMIT_MB, st.get_option("server.maxUploadSize")),
         key=f"scan.folder.{nonce}", label_visibility="collapsed",
     )
     st.caption("Only source, configuration, Dockerfiles and lockfiles are kept, and uploads are deleted as soon "

@@ -68,8 +68,9 @@ def _actions(report: Report) -> None:
                     file_name=f"secura-{report.report_id}.{fmt}", mime=mime, icon=icon,
                     key=f"report.export.{fmt}", width="stretch", on_click="ignore",
                 )
-            if SETTINGS.public_api_url:
-                st.link_button("Printable view", f"{SETTINGS.public_api_url}/api/reports/{report.report_id}/view",
+            browser_api = SETTINGS.browser_api_url(st.context.headers.get("Host") or "")
+            if browser_api:
+                st.link_button("Printable view", f"{browser_api}/api/reports/{report.report_id}/view",
                                icon=":material/print:", width="stretch")
         with st.popover("", icon=":material/delete:", help="Delete report"):
             st.markdown("Delete this report permanently?")

@@ -18,7 +18,7 @@ local or cloud AI model and grounded in a curated knowledge base that works offl
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-18181b)
 ![License](https://img.shields.io/badge/license-GPL--3.0-18181b)
-![Tests](https://img.shields.io/badge/tests-222%20passing-18181b)
+![Tests](https://img.shields.io/badge/tests-224%20passing-18181b)
 
 </div>
 
@@ -68,6 +68,21 @@ docker run -p 8501:8501 -v secura-data:/data secura
 
 The image runs as an unprivileged user and stores reports in the `/data` volume.
 Render and similar platforms work out of the box: the interface listens on `$PORT` when set.
+
+### Vercel
+
+Secura runs on Vercel's Container Runtime (beta) from `Dockerfile.vercel`.
+
+1. Import the repository at [vercel.com/new](https://vercel.com/new).
+2. Add the environment variable `PORT` with the value `8501`. Vercel routes traffic to port 80 unless `PORT` is set.
+3. Optional: there is no Ollama on Vercel, so set `SECURA_AI_PROVIDER=openai`, `SECURA_AI_API_BASE`,
+   `SECURA_AI_API_KEY` and `SECURA_AI_API_MODEL` to explain findings with a cloud model.
+4. Deploy. Every push to `main` redeploys.
+
+Vercel instances are stateless and sleep after five minutes without traffic, so stored reports and
+keys pasted under Settings do not survive a restart. Uploads are limited to 4 MB per file, and live
+connections reconnect every five minutes on the Hobby plan. For a persistent report history, use
+Render or Docker with a volume.
 
 ## How it works
 
@@ -167,7 +182,7 @@ Scan only code you own or are authorised to test.
 ## Development
 
 ```bash
-.venv/bin/python -m pytest        # 222 tests, about ten seconds, fully offline
+.venv/bin/python -m pytest        # 224 tests, about ten seconds, fully offline
 .venv/bin/ruff check .            # lint
 ```
 

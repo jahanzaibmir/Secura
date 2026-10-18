@@ -50,7 +50,8 @@ class OllamaAnalyzer(BaseAnalyzer):
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=3)
         except requests.RequestException:
-            return Readiness(False, f"Ollama is not reachable at {self.base_url}. Start it with: ollama serve")
+            return Readiness(False, f"Local AI (Ollama) is not reachable at {self.base_url}. Start it with "
+                             "ollama serve, or connect a cloud provider in Settings.")
         if response.status_code != 200:
             return Readiness(False, f"Ollama responded with HTTP {response.status_code}.")
         try:
