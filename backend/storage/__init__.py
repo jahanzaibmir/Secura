@@ -1,1 +1,1 @@
-"""Secura storage package."""
+"""Persistence: reports, uploads, exports, and temporary workspaces."""

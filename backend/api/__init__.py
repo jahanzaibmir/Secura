@@ -1,1 +1,1 @@
-"""Secura API package — schemas and routes."""
+"""HTTP layer: routes, error handling and middleware."""

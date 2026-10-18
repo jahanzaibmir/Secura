@@ -1,12 +1,8 @@
-# --- backend ---
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-pydantic==2.10.4
-requests==2.32.3
-gitpython==3.1.44
-bandit==1.8.2
-python-multipart==0.0.20
-# --- interface ---
-streamlit==1.41.1
-# --- dev / tests ---
-pytest==8.3.4
+fastapi==0.142.2
+starlette==1.7.0
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+python-multipart==0.0.32
+requests==2.34.2
+bandit==1.9.4
+streamlit==1.65.0

@@ -1,0 +1,39 @@
+:root {
+  --sc-critical: #e5484d;
+  --sc-high: #f76b15;
+  --sc-medium: #e2a300;
+  --sc-low: #3e63dd;
+  --sc-info: #8b8d98;
+  --sc-ok: #30a46c;
+  --sc-running: #3e63dd;
+
+  --sc-radius-sm: 8px;
+  --sc-radius: 12px;
+  --sc-radius-lg: 16px;
+
+  --sc-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sc-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --sc-line: color-mix(in srgb, currentColor 11%, transparent);
+  --sc-line-strong: color-mix(in srgb, currentColor 18%, transparent);
+  --sc-fill: color-mix(in srgb, currentColor 3%, transparent);
+  --sc-fill-strong: color-mix(in srgb, currentColor 6%, transparent);
+  --sc-muted: color-mix(in srgb, currentColor 62%, transparent);
+  --sc-faint: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.sc-code, .sc-mono, .sc-tag, .sc-finding-loc, pre, code {
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+.sev-critical { --sev: var(--sc-critical); }
+.sev-high { --sev: var(--sc-high); }
+.sev-medium { --sev: var(--sc-medium); }
+.sev-low { --sev: var(--sc-low); }
+.sev-info { --sev: var(--sc-info); }
+
+.grade-A, .grade-B { --grade: var(--sc-ok); }
+.grade-C { --grade: var(--sc-medium); }
+.grade-D { --grade: var(--sc-high); }
+.grade-F { --grade: var(--sc-critical); }

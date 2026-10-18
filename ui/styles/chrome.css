@@ -1,0 +1,63 @@
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+footer {
+  display: none !important;
+}
+
+[data-testid="stMainBlockContainer"],
+.block-container {
+  max-width: 1120px;
+  padding-top: 4.75rem;
+  padding-bottom: 5rem;
+}
+
+[data-testid="stHeader"] {
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+}
+
+h1, h2, h3 { letter-spacing: -0.022em; }
+
+[data-testid="stMarkdownContainer"] p { line-height: 1.65; }
+
+[data-testid="stCaptionContainer"] { opacity: 0.9; }
+
+[data-testid="stBaseButton-primary"] {
+  font-weight: 550;
+  transition: transform 0.12s var(--sc-ease), box-shadow 0.12s var(--sc-ease), opacity 0.12s;
+}
+[data-testid="stBaseButton-primary"]:hover { transform: translateY(-1px); }
+
+[data-testid^="stBaseButton-primary"] { isolation: isolate; }
+[data-testid^="stBaseButton-primary"] > * { mix-blend-mode: difference; }
+[data-testid="stBaseButton-secondary"],
+[data-testid="stBaseButton-tertiary"] { font-weight: 500; }
+
+[data-testid="stFileUploaderDropzone"] {
+  border-style: dashed;
+  border-width: 1.5px;
+  padding: 1.6rem 1.2rem;
+}
+
+[data-testid="stFileChips"] {
+  max-height: 9.5rem;
+  overflow-y: auto;
+}
+
+[data-testid="stExpander"] details { border-radius: var(--sc-radius); }
+
+[data-testid="stTabs"] [data-baseweb="tab-list"] { gap: 0.25rem; }
+
+[data-testid="stVerticalBlockBorderWrapper"] { border-radius: var(--sc-radius-lg); }
+
+@media (max-width: 640px) {
+  [data-testid="stMainBlockContainer"], .block-container { padding-top: 4.25rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
+  }
+}

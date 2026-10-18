@@ -1,25 +1,25 @@
-from fastapi import APIRouter
+"""Service health and capabilities."""
+from __future__ import annotations
 
-from backend.api.schemas import HealthResponse
-from backend.core import context
+from fastapi import APIRouter, Depends
+
+from backend.api.dependencies import get_container
+from backend.core.container import Container
+from backend.schemas import HealthResponse
 
 router = APIRouter(tags=["system"])
 
 
-@router.get("/api/health", response_model=HealthResponse)
-def health() -> HealthResponse:
-    analyzer = context.ai_manager.current()
+@router.get("/health", response_model=HealthResponse, summary="Service health and capabilities")
+def health(container: Container = Depends(get_container)) -> HealthResponse:
+    running, queued = container.jobs.counts()
     return HealthResponse(
         status="ok",
-        version=context.settings.app_version,
-        ollama={
-            "provider": "api" if context.ai_manager.is_api() else "ollama",
-            "reachable": analyzer.is_available(),
-            "version": analyzer.server_version(),
-            "model": analyzer.model,
-            "model_installed": analyzer.model_installed(),
-            "ai_enabled": context.settings.enable_ai,
-            "ai_ready": analyzer.can_analyze(),
-        },
-        scanners_registered=context.registry.registered_types(),
+        version=container.settings.version,
+        ai=container.ai.ai_status(),
+        engines=container.engine_info(),
+        sources=container.sources.types(),
+        allow_local_paths=container.settings.allow_local_paths,
+        active_scans=running,
+        queued_scans=queued,
     )

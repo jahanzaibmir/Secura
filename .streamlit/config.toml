@@ -1,0 +1,39 @@
+[server]
+headless = true
+maxUploadSize = 200
+enableXsrfProtection = true
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = "none"
+
+[theme]
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap"
+baseFontSize = 15
+baseRadius = "0.55rem"
+buttonRadius = "0.55rem"
+showWidgetBorder = true
+headingFontWeights = [650, 600, 600, 600, 600, 600]
+
+[theme.light]
+primaryColor = "#18181b"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f4f5"
+textColor = "#18181b"
+borderColor = "#e4e4e7"
+linkColor = "#2563eb"
+codeBackgroundColor = "#f4f4f5"
+
+[theme.dark]
+primaryColor = "#fafafa"
+backgroundColor = "#09090b"
+secondaryBackgroundColor = "#18181b"
+textColor = "#fafafa"
+borderColor = "#27272a"
+linkColor = "#60a5fa"
+codeBackgroundColor = "#18181b"

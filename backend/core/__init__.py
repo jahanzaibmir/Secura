@@ -1,1 +1,1 @@
-"""Secura core services — jobs, pipeline, registry, validators."""
+"""Core services: jobs, execution, the scan pipeline, validation, and scoring."""
