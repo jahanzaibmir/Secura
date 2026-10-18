@@ -1,142 +1,192 @@
 """Thread-safe in-memory scan job tracker.
 
-Jobs are mutated by worker threads and read by request handlers,
-so every access goes through one lock and readers get immutable views.
-list_summaries() backs the UI's persistent "Recent uploads" panel —
-the backend, not the browser, is the source of truth for scan state.
+Worker threads mutate jobs while request handlers read them, so every access
+goes through a single lock and readers only ever receive immutable views.
+Overall progress is derived from weighted stages, so the bar moves smoothly and
+never goes backwards.
 """
-import threading
-import time
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from __future__ import annotations
 
-from backend.api.schemas import (
-    JobStatus, JobSummary, JobView, Report, ScanRequest, StageInfo, new_id,
+import threading
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+from backend.core.cancellation import CancelToken
+from backend.exceptions import JobNotFound
+from backend.schemas import (
+    JobStatus,
+    JobView,
+    Report,
+    RiskScore,
+    ScanRequest,
+    ScanSummary,
+    StageInfo,
+    StageStatus,
+    new_id,
+    utc_now,
 )
 
-_TERMINAL = (JobStatus.COMPLETED, JobStatus.FAILED)
+StageSpec = tuple[str, str, float]
+
+
+@dataclass
+class _Stage:
+    key: str
+    label: str
+    weight: float
+    status: StageStatus = StageStatus.PENDING
+    detail: str = ""
+    fraction: float = 0.0
 
 
 @dataclass
 class Job:
     job_id: str
     request: ScanRequest
-    label: Optional[str] = None          # friendly name ("myproject · 7 file(s)")
+    label: str
+    created_at: datetime = field(default_factory=utc_now)
     status: JobStatus = JobStatus.QUEUED
-    progress: int = 0
+    stages: list[_Stage] = field(default_factory=list)
     current_stage: str = ""
-    stages: List[StageInfo] = field(default_factory=list)
-    error: Optional[str] = None
-    report: Optional[Report] = None
-    created_at: float = field(default_factory=time.time)
+    progress: int = 0
+    error: str | None = None
+    report_id: str | None = None
+    summary: ScanSummary | None = None
+    risk: RiskScore | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    cleanup_path: Path | None = None
+    token: CancelToken = field(default_factory=CancelToken)
 
     def view(self) -> JobView:
         return JobView(
             job_id=self.job_id,
+            label=self.label,
             target=self.request.target,
             target_type=self.request.target_type,
             status=self.status,
-            label=self.label,
             progress=self.progress,
             current_stage=self.current_stage,
-            stages=[StageInfo(**s.model_dump()) for s in self.stages],
+            stages=[
+                StageInfo(key=s.key, label=s.label, status=s.status, detail=s.detail)
+                for s in self.stages
+            ],
             error=self.error,
-            report=self.report,
-        )
-
-    def summary(self) -> JobSummary:
-        return JobSummary(
-            job_id=self.job_id,
-            label=self.label,
-            target=self.request.target,
-            target_type=self.request.target_type,
-            status=self.status,
-            progress=self.progress,
-            current_stage=self.current_stage,
+            report_id=self.report_id,
+            summary=self.summary.model_copy() if self.summary else None,
+            risk=self.risk.model_copy() if self.risk else None,
             created_at=self.created_at,
-            report_id=self.report.report_id if self.report else None,
-            error=self.error,
+            started_at=self.started_at,
+            finished_at=self.finished_at,
         )
 
 
 class JobManager:
-    def __init__(self, max_jobs: int = 50) -> None:
-        self._jobs: Dict[str, Job] = {}
+    def __init__(self, max_jobs: int = 100) -> None:
+        self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
         self._max_jobs = max_jobs
 
-    # -- lifecycle ----------------------------------------------------------
-
-    def create(self, request: ScanRequest, label: Optional[str] = None) -> Job:
-        job = Job(job_id=new_id("job"), request=request, label=label)
+    def create(
+        self,
+        request: ScanRequest,
+        label: str | None = None,
+        cleanup_path: Path | None = None,
+    ) -> Job:
+        job = Job(
+            job_id=new_id("job"),
+            request=request,
+            label=label or request.target,
+            cleanup_path=cleanup_path,
+        )
         with self._lock:
             self._jobs[job.job_id] = job
             self._trim_locked()
         return job
 
-    def get(self, job_id: str) -> Optional[Job]:
-        with self._lock:
-            return self._jobs.get(job_id)
-
-    def get_view(self, job_id: str) -> Optional[JobView]:
+    def get(self, job_id: str) -> Job:
         with self._lock:
             job = self._jobs.get(job_id)
-            return job.view() if job is not None else None
+        if job is None:
+            raise JobNotFound(f"Unknown scan job: {job_id}")
+        return job
 
-    def list_summaries(self) -> List[JobSummary]:
-        """All jobs, newest first — the persistence backbone for the UI."""
-        with self._lock:
-            items = [job.summary() for job in self._jobs.values()]
-        items.sort(key=lambda s: s.created_at, reverse=True)
-        return items
-
-    # -- stage transitions ----------------------------------------------------
-
-    def start(self, job_id: str, stage_names: List[str]) -> None:
+    def view(self, job_id: str) -> JobView:
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None or job.status == JobStatus.RUNNING:
-                return
+            if job is None:
+                raise JobNotFound(f"Unknown scan job: {job_id}")
+            return job.view()
+
+    def list_views(self) -> list[JobView]:
+        with self._lock:
+            views = [job.view() for job in self._jobs.values()]
+        views.sort(key=lambda view: view.created_at, reverse=True)
+        return views
+
+    def counts(self) -> tuple[int, int]:
+        """Returns (running, queued)."""
+        with self._lock:
+            running = sum(1 for j in self._jobs.values() if j.status == JobStatus.RUNNING)
+            queued = sum(1 for j in self._jobs.values() if j.status == JobStatus.QUEUED)
+        return running, queued
+
+    def start(self, job_id: str, stages: Sequence[StageSpec]) -> bool:
+        """Moves a queued job to running. Returns False if it was cancelled first."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None or job.status != JobStatus.QUEUED:
+                return False
             job.status = JobStatus.RUNNING
-            job.stages = [StageInfo(name=name, status="pending") for name in stage_names]
-            job.current_stage = stage_names[0] if stage_names else ""
-            job.progress = 2
+            job.started_at = utc_now()
+            job.stages = [_Stage(key=key, label=label, weight=weight) for key, label, weight in stages]
+            job.current_stage = job.stages[0].label if job.stages else ""
+            job.progress = 1
+            return True
 
-    def begin_stage(self, job_id: str, stage_name: str) -> None:
+    def begin_stage(self, job_id: str, key: str, detail: str = "") -> None:
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None:
+            stage = self._stage_locked(job, key)
+            if job is None or stage is None:
                 return
-            self._set_stage_locked(job, stage_name, "running")
-            job.current_stage = stage_name
+            stage.status = StageStatus.RUNNING
+            stage.detail = detail
+            stage.fraction = 0.0
+            job.current_stage = stage.label
+            self._recompute_locked(job)
 
-    def finish_stage(self, job_id: str, stage_name: str, status: str = "done", detail: str = "") -> None:
+    def update_stage(
+        self, job_id: str, key: str, detail: str | None = None,
+        fraction: float | None = None,
+    ) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None:
+            stage = self._stage_locked(job, key)
+            if job is None or stage is None or stage.status != StageStatus.RUNNING:
                 return
-            self._set_stage_locked(job, stage_name, status, detail)
-            job.progress = self._stage_progress_locked(job)
+            if detail is not None:
+                stage.detail = detail
+            if fraction is not None:
+                stage.fraction = max(stage.fraction, min(1.0, max(0.0, fraction)))
+            self._recompute_locked(job)
 
-    def touch(self, job_id: str, stage_name: str, detail: str) -> None:
-        """Live detail update from inside a running stage."""
+    def finish_stage(
+        self, job_id: str, key: str, status: StageStatus = StageStatus.DONE,
+        detail: str | None = None,
+    ) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
-            if job is None:
+            stage = self._stage_locked(job, key)
+            if job is None or stage is None:
                 return
-            for stage in job.stages:
-                if stage.name == stage_name and stage.status == "running":
-                    stage.detail = detail
-                    return
-
-    def bump_progress(self, job_id: str, pct: int) -> None:
-        """Raise progress to pct if higher (never lowers, never reaches 100)."""
-        with self._lock:
-            job = self._jobs.get(job_id)
-            if job is None or job.status != JobStatus.RUNNING:
-                return
-            if pct > job.progress:
-                job.progress = min(pct, 99)
+            stage.status = status
+            stage.fraction = 1.0
+            if detail is not None:
+                stage.detail = detail
+            self._recompute_locked(job)
 
     def complete(self, job_id: str, report: Report) -> None:
         with self._lock:
@@ -145,51 +195,77 @@ class JobManager:
                 return
             job.status = JobStatus.COMPLETED
             job.progress = 100
-            job.report = report
             job.current_stage = ""
+            job.report_id = report.report_id
+            job.summary = report.summary.model_copy()
+            job.risk = report.risk.model_copy()
+            job.finished_at = utc_now()
             for stage in job.stages:
-                if stage.status in ("pending", "running"):
-                    stage.status = "done"
+                if not stage.status.is_settled:
+                    stage.status = StageStatus.DONE
 
     def fail(self, job_id: str, error: str) -> None:
+        self._settle(job_id, JobStatus.FAILED, error, StageStatus.FAILED)
+
+    def mark_cancelled(self, job_id: str) -> None:
+        self._settle(job_id, JobStatus.CANCELLED, "Cancelled by user.", StageStatus.SKIPPED)
+
+    def cancel(self, job_id: str) -> JobView:
+        """Requests cancellation. Queued jobs stop immediately, running jobs cooperatively."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if job is None:
+                raise JobNotFound(f"Unknown scan job: {job_id}")
+            job.token.cancel()
+            if job.status == JobStatus.QUEUED:
+                job.status = JobStatus.CANCELLED
+                job.error = "Cancelled by user."
+                job.finished_at = utc_now()
+            return job.view()
+
+    def _settle(self, job_id: str, status: JobStatus, error: str, open_stage: StageStatus) -> None:
         with self._lock:
             job = self._jobs.get(job_id)
             if job is None:
                 return
-            job.status = JobStatus.FAILED
+            job.status = status
             job.error = error
             job.current_stage = ""
+            job.finished_at = utc_now()
             for stage in job.stages:
-                if stage.status == "running":
-                    stage.status = "skipped"
-
-    # -- internals ------------------------------------------------------------
+                if stage.status == StageStatus.RUNNING:
+                    stage.status = open_stage
+                elif stage.status == StageStatus.PENDING:
+                    stage.status = StageStatus.SKIPPED
 
     @staticmethod
-    def _set_stage_locked(job: Job, stage_name: str, status: str, detail: str = "") -> None:
+    def _stage_locked(job: Job | None, key: str) -> _Stage | None:
+        if job is None:
+            return None
         for stage in job.stages:
-            if stage.name == stage_name:
-                stage.status = status
-                if detail:
-                    stage.detail = detail
-                return
-        job.stages.append(StageInfo(name=stage_name, status=status, detail=detail))
+            if stage.key == key:
+                return stage
+        return None
 
     @staticmethod
-    def _stage_progress_locked(job: Job) -> int:
-        if not job.stages:
-            return job.progress
-        done = sum(1 for s in job.stages if s.status in ("done", "skipped"))
-        return min(99, int((done / len(job.stages)) * 100))
+    def _recompute_locked(job: Job) -> None:
+        total = sum(stage.weight for stage in job.stages) or 1.0
+        earned = 0.0
+        for stage in job.stages:
+            if stage.status.is_settled:
+                earned += stage.weight
+            elif stage.status == StageStatus.RUNNING:
+                earned += stage.weight * stage.fraction
+        job.progress = max(job.progress, min(99, int(earned / total * 100)))
 
     def _trim_locked(self) -> None:
-        if len(self._jobs) <= self._max_jobs:
+        excess = len(self._jobs) - self._max_jobs
+        if excess <= 0:
             return
         finished = sorted(
             (job.created_at, job_id)
             for job_id, job in self._jobs.items()
-            if job.status in _TERMINAL
+            if job.status.is_terminal
         )
-        excess = len(self._jobs) - self._max_jobs
         for _, job_id in finished[:excess]:
             self._jobs.pop(job_id, None)

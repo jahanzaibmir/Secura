@@ -1,1 +1,0 @@
-"""Secura scanner utilities."""

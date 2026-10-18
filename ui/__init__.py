@@ -1,1 +1,1 @@
-"""Secura interface package."""
+"""Secura web interface (Streamlit)."""
