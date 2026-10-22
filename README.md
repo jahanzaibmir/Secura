@@ -10,7 +10,7 @@ Scan a GitHub repository, a folder, or a zip archive with five analysis engines.
 Every issue comes with a plain-language explanation and a concrete fix, written by a
 local or cloud AI model and grounded in a curated knowledge base that works offline.
 
-[Live instance](https://secura-5f5c.onrender.com) ·
+[Live instance](https://secura-amber-two.vercel.app) ·
 [Quick start](#quick-start) ·
 [How it works](#how-it-works) ·
 [API](#http-api) ·
